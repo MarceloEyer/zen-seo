@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zen SEO Lite (Headless)
  * Description: SEO essencial, leve e focado em performance para arquiteturas Headless/React. Gera Meta Tags, Open Graph, Schema e Sitemaps.
- * Version: 1.2.0
+ * Version: 1.3.0
  * Author: Zen Eyer
  * Text Domain: zen-seo
  */
@@ -15,6 +15,7 @@ class Zen_SEO_Lite {
         // 1. Admin Interface
         add_action('add_meta_boxes', [$this, 'add_meta_boxes']);
         add_action('save_post', [$this, 'save_meta_data']);
+        add_action('admin_notices', [$this, 'admin_notices']);
         
         // 2. API REST (Frontend)
         add_action('rest_api_init', [$this, 'register_api_fields']);
@@ -75,13 +76,13 @@ class Zen_SEO_Lite {
     }
 
     public function save_meta_data($post_id) {
-        // Verificações de segurança padrão
+        // Verificações de segurança
         if (!isset($_POST['zen_seo_nonce']) || !wp_verify_nonce($_POST['zen_seo_nonce'], 'zen_seo_save')) return;
         if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
         if (!current_user_can('edit_post', $post_id)) return;
 
         if (isset($_POST['zen_seo'])) {
-            // Validação e Sanitização Rigorosa
+            // Validação Rigorosa
             $data = [
                 'title'   => isset($_POST['zen_seo']['title']) ? mb_substr(sanitize_text_field($_POST['zen_seo']['title']), 0, 60) : '',
                 'desc'    => isset($_POST['zen_seo']['desc']) ? mb_substr(sanitize_textarea_field($_POST['zen_seo']['desc']), 0, 160) : '',
@@ -89,6 +90,13 @@ class Zen_SEO_Lite {
                 'noindex' => isset($_POST['zen_seo']['noindex']) ? 1 : 0,
             ];
             update_post_meta($post_id, '_zen_seo_data', $data);
+            // Removido wp_redirect para evitar conflitos no editor de blocos
+        }
+    }
+
+    public function admin_notices() {
+        if (isset($_GET['message']) && $_GET['message'] == 'zen_seo_saved') {
+            echo '<div class="notice notice-success"><p>' . __('SEO settings saved!', 'zen-seo') . '</p></div>';
         }
     }
 
@@ -114,7 +122,7 @@ class Zen_SEO_Lite {
         // Fallbacks Inteligentes
         $title = !empty($meta['title']) ? $meta['title'] : get_the_title($post_id) . ' | Zen Eyer';
         
-        // Tenta pegar description do Yoast/RankMath se migrar, senão usa excerpt ou conteúdo
+        // Tenta pegar excerpt se descrição vazia
         $desc = !empty($meta['desc']) ? $meta['desc'] : get_the_excerpt($post_id);
         if (empty($desc)) {
             $desc = wp_trim_words(get_post_field('post_content', $post_id), 20);
@@ -203,7 +211,7 @@ class Zen_SEO_Lite {
     }
 
     // =========================================================================
-    // 3. SITEMAP XML (COM CACHE TRANSIENT)
+    // 3. SITEMAP XML (OTIMIZADO SEMANALMENTE)
     // =========================================================================
 
     public function register_sitemap_rewrite() {
@@ -221,7 +229,7 @@ class Zen_SEO_Lite {
 
     public function render_sitemap() {
         if (get_query_var('zen_sitemap')) {
-            // Tenta pegar do cache (Transient) por 1 hora
+            // Tenta pegar do cache (Transient)
             $sitemap = get_transient('zen_seo_sitemap');
             
             // Se não tem cache, gera
@@ -248,10 +256,13 @@ class Zen_SEO_Lite {
                         // Prioridade Dinâmica (Recentes = 0.9, Antigos = 0.7)
                         $priority = (current_time('timestamp') - get_the_modified_time('U', $post->ID) < MONTH_IN_SECONDS) ? '0.9' : '0.7';
                         
+                        // Se for a Home, prioridade máxima
+                        if ($post->ID === get_option('page_on_front')) $priority = '1.0';
+
                         echo '<url>';
                         echo '<loc>' . esc_url(get_permalink($post->ID)) . '</loc>';
                         echo '<lastmod>' . get_the_modified_date('Y-m-d', $post->ID) . '</lastmod>';
-                        echo '<changefreq>weekly</changefreq>';
+                        echo '<changefreq>weekly</changefreq>'; // Frequência ajustada para Semanal
                         echo '<priority>' . $priority . '</priority>';
                         echo '</url>';
                     }
@@ -259,8 +270,9 @@ class Zen_SEO_Lite {
                 echo '</urlset>';
                 $sitemap = ob_get_clean();
                 
-                // Salva no cache por 1 hora (3600 segundos)
-                set_transient('zen_seo_sitemap', $sitemap, 3600);
+                // Salva no cache por 1 SEMANA (604800 segundos)
+                // Se editar post, limpa na hora.
+                set_transient('zen_seo_sitemap', $sitemap, WEEK_IN_SECONDS);
             }
 
             // Entrega o XML
