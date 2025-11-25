@@ -1,8 +1,8 @@
 <?php
 /**
- * Plugin Name: Zen SEO Lite (Headless)
- * Description: Solução completa de SEO para React/Headless. Inclui Meta Tags, Schema.org avançado para Artistas (MusicGroup), Sitemaps e Painel de Controle Global.
- * Version: 2.0.0
+ * Plugin Name: Zen SEO Lite (Artist Edition)
+ * Description: Otimização SEO definitiva para Músicos e DJs. Integração profunda com Knowledge Graph (MusicBrainz, Wikidata, ISNI), Schema.org Musical e Sitemaps.
+ * Version: 2.1.0
  * Author: Zen Eyer
  * Text Domain: zen-seo
  */
@@ -12,19 +12,17 @@ if (!defined('ABSPATH')) exit;
 class Zen_SEO_Lite {
 
     public function __construct() {
-        // 1. Admin Interface (Post Meta Boxes)
+        // 1. Admin (Meta Boxes & Configurações)
         add_action('add_meta_boxes', [$this, 'add_meta_boxes']);
         add_action('save_post', [$this, 'save_meta_data']);
-        add_action('admin_notices', [$this, 'admin_notices']);
-
-        // 2. Admin Menu (Configurações Globais)
         add_action('admin_menu', [$this, 'add_admin_menu']);
         add_action('admin_init', [$this, 'register_settings']);
-        
-        // 3. API REST (Frontend Data)
+        add_action('admin_notices', [$this, 'admin_notices']);
+
+        // 2. API REST (Frontend Data)
         add_action('rest_api_init', [$this, 'register_api_fields']);
 
-        // 4. Sitemap XML
+        // 3. Sitemap XML
         add_action('init', [$this, 'register_sitemap_rewrite']);
         add_filter('query_vars', [$this, 'register_query_vars']);
         add_action('template_redirect', [$this, 'render_sitemap']);
@@ -32,58 +30,70 @@ class Zen_SEO_Lite {
     }
 
     // =========================================================================
-    // 1. PAINEL DE OPÇÕES GLOBAIS (SOCIAL & IDENTIDADE)
+    // 1. PAINEL DE IDENTIDADE DO ARTISTA (O "HUB" DE CREDIBILIDADE)
     // =========================================================================
 
     public function add_admin_menu() {
-        add_menu_page(
-            'Zen SEO', 
-            'Zen SEO', 
-            'manage_options', 
-            'zen-seo-settings', 
-            [$this, 'render_settings_page'], 
-            'dashicons-chart-line', 
-            99
-        );
+        add_menu_page('Zen SEO', 'Zen SEO', 'manage_options', 'zen-seo-settings', [$this, 'render_settings_page'], 'dashicons-album', 99);
     }
 
     public function register_settings() {
         register_setting('zen_seo_options', 'zen_seo_global');
         
-        add_settings_section('zen_seo_social', 'Identidade do Artista (Knowledge Graph)', null, 'zen-seo-settings');
+        // Seção 1: Identidade & Autoridade (Vital para IAs)
+        add_settings_section('zen_seo_authority', '🎵 Autoridade & Identidade (Google Knowledge Graph)', null, 'zen-seo-settings');
         
-        $fields = [
-            'facebook' => 'Facebook URL',
-            'instagram' => 'Instagram URL',
-            'youtube' => 'YouTube URL',
-            'soundcloud' => 'SoundCloud URL',
+        $authority_fields = [
+            'wikidata' => 'Wikidata URL (ex: Q136551855)',
+            'musicbrainz' => 'MusicBrainz Artist URL',
+            'isni' => 'ISNI Code (International Standard Name Identifier)',
+            'google_knowledge' => 'Google Knowledge Panel ID (se já tiver)'
+        ];
+
+        foreach ($authority_fields as $id => $label) {
+            add_settings_field($id, $label, [$this, 'render_field'], 'zen-seo-settings', 'zen_seo_authority', ['id' => $id, 'tip' => 'Fundamental para IAs saberem quem é você.']);
+        }
+
+        // Seção 2: Streaming & Plataformas (Credibilidade)
+        add_settings_section('zen_seo_streaming', '🎧 Streaming & Social', null, 'zen-seo-settings');
+
+        $streaming_fields = [
             'spotify' => 'Spotify Artist URL',
-            'musicbrainz' => 'MusicBrainz ID (URL)',
-            'wikidata' => 'Wikidata URL',
+            'apple_music' => 'Apple Music URL',
+            'soundcloud' => 'SoundCloud URL',
+            'bandsintown' => 'Bandsintown URL',
+            'youtube' => 'YouTube Channel URL',
+            'instagram' => 'Instagram URL',
+            'facebook' => 'Facebook URL',
+            'tiktok' => 'TikTok URL',
             'default_image' => 'Imagem de Compartilhamento Padrão (URL)'
         ];
 
-        foreach ($fields as $id => $label) {
-            add_settings_field($id, $label, [$this, 'render_field'], 'zen-seo-settings', 'zen_seo_social', ['id' => $id]);
+        foreach ($streaming_fields as $id => $label) {
+            add_settings_field($id, $label, [$this, 'render_field'], 'zen-seo-settings', 'zen_seo_streaming', ['id' => $id]);
         }
     }
 
     public function render_field($args) {
         $options = get_option('zen_seo_global');
         $value = $options[$args['id']] ?? '';
-        echo "<input type='url' name='zen_seo_global[{$args['id']}]' value='" . esc_attr($value) . "' class='regular-text'>";
+        $placeholder = empty($value) ? 'Cole o link aqui...' : '';
+        echo "<input type='text' name='zen_seo_global[{$args['id']}]' value='" . esc_attr($value) . "' class='regular-text' placeholder='{$placeholder}'>";
+        if (empty($value) && isset($args['tip'])) {
+            echo "<p class='description' style='color: #d63638;'>⚠️ " . $args['tip'] . " (Pendente)</p>";
+        }
     }
 
     public function render_settings_page() {
         ?>
         <div class="wrap">
-            <h1>🚀 Zen SEO Headless - Configurações Globais</h1>
-            <p>Preencha os dados abaixo para garantir que o Google conecte seu site às suas redes sociais e perfis de artista.</p>
+            <h1>🚀 Zen SEO - Painel do Artista</h1>
+            <p>Preencha esses campos para conectar seu site ao ecossistema musical global (Google, Spotify, MusicBrainz).</p>
             <form method="post" action="options.php">
                 <?php
                 settings_fields('zen_seo_options');
                 do_settings_sections('zen-seo-settings');
-                submit_button('Salvar Configurações');
+                submit_button('Salvar Identidade');
                 ?>
             </form>
         </div>
@@ -115,8 +125,8 @@ class Zen_SEO_Lite {
                 <textarea name="zen_seo[desc]" rows="2" style="width:100%" maxlength="160"><?php echo esc_textarea($meta['desc'] ?? ''); ?></textarea>
             </div>
             <div>
-                <label><strong>Imagem de Compartilhamento (OG Image)</strong></label>
-                <input type="url" name="zen_seo[image]" value="<?php echo esc_url($meta['image'] ?? ''); ?>" style="width:100%" placeholder="URL...">
+                <label><strong>Imagem OG</strong></label>
+                <input type="url" name="zen_seo[image]" value="<?php echo esc_url($meta['image'] ?? ''); ?>" style="width:100%">
             </div>
             <div>
                 <label><input type="checkbox" name="zen_seo[noindex]" value="1" <?php checked(isset($meta['noindex']) && $meta['noindex']); ?>> 🚫 NoIndex</label>
@@ -143,7 +153,7 @@ class Zen_SEO_Lite {
 
     public function admin_notices() {
         if (isset($_GET['settings-updated'])) {
-            echo '<div class="notice notice-success"><p>Configurações globais salvas!</p></div>';
+            echo '<div class="notice notice-success"><p>Identidade do Artista atualizada! O Google Knowledge Graph agradece.</p></div>';
         }
     }
 
@@ -163,11 +173,9 @@ class Zen_SEO_Lite {
         $meta = get_post_meta($post_id, '_zen_seo_data', true) ?: [];
         $global = get_option('zen_seo_global') ?: [];
         
-        // Fallbacks
         $title = !empty($meta['title']) ? $meta['title'] : get_the_title($post_id) . ' | Zen Eyer';
         $desc = !empty($meta['desc']) ? $meta['desc'] : wp_trim_words(get_post_field('post_content', $post_id), 20);
         
-        // Imagem: Custom -> Destacada -> Padrão Global
         $image = $meta['image'] ?? '';
         if (empty($image)) $image = get_the_post_thumbnail_url($post_id, 'large');
         if (empty($image)) $image = $global['default_image'] ?? '';
@@ -185,7 +193,7 @@ class Zen_SEO_Lite {
                 ['property' => 'og:title', 'content' => $title],
                 ['property' => 'og:description', 'content' => $desc],
                 ['property' => 'og:image', 'content' => $image],
-                ['property' => 'og:type', 'content' => 'article'],
+                ['property' => 'og:type', 'content' => 'website'],
                 ['property' => 'og:url', 'content' => $canonical],
                 ['name' => 'twitter:card', 'content' => 'summary_large_image'],
             ],
@@ -194,10 +202,10 @@ class Zen_SEO_Lite {
     }
 
     private function generate_schema($post_id, $type, $title, $desc, $image, $global) {
-        // Constrói lista de "SameAs" (Perfis Sociais)
+        // Lista de autoridade (SameAs)
         $same_as = [];
-        $social_keys = ['facebook', 'instagram', 'youtube', 'soundcloud', 'spotify', 'musicbrainz', 'wikidata'];
-        foreach ($social_keys as $key) {
+        $keys = ['wikidata', 'musicbrainz', 'isni', 'spotify', 'apple_music', 'soundcloud', 'bandsintown', 'youtube', 'instagram', 'facebook', 'tiktok'];
+        foreach ($keys as $key) {
             if (!empty($global[$key])) $same_as[] = $global[$key];
         }
 
@@ -206,15 +214,20 @@ class Zen_SEO_Lite {
             '@graph'   => [],
         ];
 
-        // 1. Person/Organization (Global - Aparece em todas as páginas)
+        // 1. Person (A Entidade DJ Zen Eyer) - Aparece em TUDO
         $base_schema['@graph'][] = [
             '@type' => 'Person',
             '@id' => home_url('/#artist'),
             'name' => 'DJ Zen Eyer',
             'url' => home_url(),
             'jobTitle' => 'Brazilian Zouk DJ & Producer',
+            'nationality' => 'Brazilian',
             'sameAs' => $same_as,
-            'image' => $global['default_image'] ?? ''
+            'image' => $global['default_image'] ?? '',
+            'memberOf' => [
+                '@type' => 'Organization',
+                'name' => 'Mensa International'
+            ]
         ];
 
         // 2. WebPage
@@ -225,30 +238,15 @@ class Zen_SEO_Lite {
             'name' => $title,
             'description' => $desc,
             'isPartOf' => ['@id' => home_url('/#website')],
-            'about' => ['@id' => home_url('/#artist')] // Conecta a página ao Artista
+            'about' => ['@id' => home_url('/#artist')]
         ];
 
-        // 3. Específicos
-        if ($type === 'product' && function_exists('wc_get_product')) {
-            $product = wc_get_product($post_id);
-            if ($product) {
-                $base_schema['@graph'][] = [
-                    '@type' => 'Product',
-                    'name' => $product->get_name(),
-                    'image' => $image,
-                    'offers' => [
-                        '@type' => 'Offer',
-                        'price' => $product->get_price(),
-                        'priceCurrency' => get_woocommerce_currency(),
-                        'availability' => $product->is_in_stock() ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-                    ],
-                ];
-            }
-        } elseif ($type === 'remixes') {
+        // 3. Schemas Específicos
+        if ($type === 'remixes') {
             $base_schema['@graph'][] = [
-                '@type' => 'MusicComposition',
+                '@type' => 'MusicRecording',
                 'name' => $title,
-                'composer' => ['@id' => home_url('/#artist')], // Referência ao artista global
+                'byArtist' => ['@id' => home_url('/#artist')],
                 'url' => get_permalink($post_id)
             ];
         } elseif ($type === 'events') {
@@ -257,7 +255,7 @@ class Zen_SEO_Lite {
                 'name' => $title,
                 'description' => $desc,
                 'image' => $image,
-                'organizer' => ['@id' => home_url('/#artist')],
+                'performer' => ['@id' => home_url('/#artist')],
             ];
         }
 
@@ -265,15 +263,11 @@ class Zen_SEO_Lite {
     }
 
     // =========================================================================
-    // 4. SITEMAP XML
+    // 4. SITEMAP XML (CACHE SEMANAL)
     // =========================================================================
 
-    public function register_sitemap_rewrite() {
-        add_rewrite_rule('sitemap\.xml$', 'index.php?zen_sitemap=1', 'top');
-    }
-
+    public function register_sitemap_rewrite() { add_rewrite_rule('sitemap\.xml$', 'index.php?zen_sitemap=1', 'top'); }
     public function register_query_vars($vars) { $vars[] = 'zen_sitemap'; return $vars; }
-
     public function clear_sitemap_cache() { delete_transient('zen_seo_sitemap'); }
 
     public function render_sitemap() {
