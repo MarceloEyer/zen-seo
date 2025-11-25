@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Zen SEO Lite (Artist Ultimate Edition)
- * Description: SEO definitivo para DJ Zen Eyer. Gerenciador de Rotas React, Knowledge Graph, Schema Musical e Sitemap Híbrido Dinâmico.
- * Version: 3.0.0
+ * Description: SEO definitivo para DJ Zen Eyer. Gerenciador de Rotas React, Knowledge Graph Completo, Schema Musical Avançado e Sitemap Híbrido.
+ * Version: 3.1.0
  * Author: Zen Eyer
  * Text Domain: zen-seo
  */
@@ -28,9 +28,9 @@ class Zen_SEO_Lite {
         add_action('template_redirect', [$this, 'render_sitemap']);
         add_filter('robots_txt', [$this, 'custom_robots_txt'], 10, 2);
         
-        // Cache Clearing
+        // Cache
         add_action('save_post', [$this, 'clear_sitemap_cache']);
-        add_action('update_option_zen_seo_global', [$this, 'clear_sitemap_cache']); // Limpa cache ao salvar opções
+        add_action('update_option_zen_seo_global', [$this, 'clear_sitemap_cache']);
     }
 
     // =========================================================================
@@ -43,46 +43,72 @@ class Zen_SEO_Lite {
     public function register_settings() {
         register_setting('zen_seo_options', 'zen_seo_global');
         
-        // Seção 1: Identidade
-        add_settings_section('zen_seo_authority', '🎵 Identidade do Artista', null, 'zen-seo-settings');
-        $fields = [
+        // 1. IDs & Dados Mestre
+        add_settings_section('zen_ids', '🆔 Identificadores & IDs (A base do Knowledge Graph)', null, 'zen-seo-settings');
+        $ids = [
             'wikidata' => 'Wikidata URL',
             'musicbrainz' => 'MusicBrainz Artist URL',
             'isni' => 'ISNI Code',
-            'spotify' => 'Spotify URL',
-            'instagram' => 'Instagram URL',
-            'default_image' => 'Imagem Padrão (URL)'
+            'google_kg' => 'Google Knowledge Panel ID (kg_mid)',
+            'discogs' => 'Discogs Artist URL'
         ];
-        foreach ($fields as $id => $label) {
-            add_settings_field($id, $label, [$this, 'render_text_field'], 'zen-seo-settings', 'zen_seo_authority', ['id' => $id]);
-        }
+        foreach ($ids as $id => $label) add_settings_field($id, $label, [$this, 'render_text_field'], 'zen-seo-settings', 'zen_ids', ['id' => $id]);
 
-        // Seção 2: Rotas do React (NOVO!)
-        add_settings_section('zen_seo_routes', '🗺️ Mapeamento de Rotas (React)', null, 'zen-seo-settings');
-        add_settings_field('react_routes', 'Rotas Estáticas', [$this, 'render_textarea_field'], 'zen-seo-settings', 'zen_seo_routes', [
+        // 2. Streaming & Lojas (DJ Focus)
+        add_settings_section('zen_streaming', '🎧 Streaming & Lojas', null, 'zen-seo-settings');
+        $streaming = [
+            'spotify' => 'Spotify Artist URL',
+            'apple_music' => 'Apple Music URL',
+            'soundcloud' => 'SoundCloud URL',
+            'beatport' => 'Beatport DJ URL',
+            'traxsource' => 'Traxsource URL',
+            'mixcloud' => 'Mixcloud URL',
+            'deezer' => 'Deezer URL',
+            'amazon_music' => 'Amazon Music URL'
+        ];
+        foreach ($streaming as $id => $label) add_settings_field($id, $label, [$this, 'render_text_field'], 'zen-seo-settings', 'zen_streaming', ['id' => $id]);
+
+        // 3. Social & Eventos
+        add_settings_section('zen_social', '📱 Social & Agenda', null, 'zen-seo-settings');
+        $social = [
+            'instagram' => 'Instagram URL',
+            'facebook' => 'Facebook URL',
+            'youtube' => 'YouTube Channel URL',
+            'tiktok' => 'TikTok URL',
+            'resident_advisor' => 'Resident Advisor URL',
+            'bandsintown' => 'Bandsintown URL',
+            'songkick' => 'Songkick URL'
+        ];
+        foreach ($social as $id => $label) add_settings_field($id, $label, [$this, 'render_text_field'], 'zen-seo-settings', 'zen_social', ['id' => $id]);
+
+        // 4. Geral & Rotas
+        add_settings_section('zen_general', '⚙️ Configurações Gerais', null, 'zen-seo-settings');
+        add_settings_field('default_image', 'Imagem Padrão (URL)', [$this, 'render_text_field'], 'zen-seo-settings', 'zen_general', ['id' => 'default_image']);
+        
+        add_settings_field('react_routes', 'Mapeamento de Rotas React', [$this, 'render_textarea_field'], 'zen-seo-settings', 'zen_general', [
             'id' => 'react_routes',
-            'desc' => 'Liste as URLs do seu site React (uma por linha). Ex: /events'
+            'desc' => 'Liste as URLs do seu site React para o Sitemap (uma por linha).'
         ]);
     }
 
     public function render_text_field($args) {
         $options = get_option('zen_seo_global');
         $value = $options[$args['id']] ?? '';
-        echo "<input type='text' name='zen_seo_global[{$args['id']}]' value='" . esc_attr($value) . "' class='regular-text' style='width:100%'>";
+        echo "<input type='text' name='zen_seo_global[{$args['id']}]' value='" . esc_attr($value) . "' class='regular-text' style='width:100%' placeholder='https://...'>";
     }
 
     public function render_textarea_field($args) {
         $options = get_option('zen_seo_global');
-        $value = $options[$args['id']] ?? "/\n/events\n/music\n/shop\n/zentribe\n/work-with-me\n/faq"; // Default inteligente
+        $value = $options[$args['id']] ?? "/\n/events\n/shop\n/music\n/zentribe\n/work-with-me\n/faq";
         echo "<textarea name='zen_seo_global[{$args['id']}]' rows='10' class='large-text code'>" . esc_textarea($value) . "</textarea>";
         echo "<p class='description'>{$args['desc']}</p>";
     }
 
     public function render_settings_page() {
-        echo '<div class="wrap"><h1>🚀 Zen SEO - Painel de Controle</h1><form method="post" action="options.php">';
+        echo '<div class="wrap"><h1>🚀 Zen SEO - Painel de Identidade</h1><form method="post" action="options.php">';
         settings_fields('zen_seo_options');
         do_settings_sections('zen-seo-settings');
-        submit_button('Salvar Configurações');
+        submit_button('Salvar Identidade');
         echo '</form></div>';
     }
 
@@ -113,22 +139,18 @@ class Zen_SEO_Lite {
         if (!current_user_can('edit_post', $post_id)) return;
 
         if (isset($_POST['zen_seo'])) {
-            $data = [
-                'title' => sanitize_text_field($_POST['zen_seo']['title']),
-                'desc' => sanitize_textarea_field($_POST['zen_seo']['desc']),
-                'image' => esc_url_raw($_POST['zen_seo']['image']),
-                'noindex' => isset($_POST['zen_seo']['noindex']) ? 1 : 0
-            ];
+            $data = array_map('sanitize_text_field', $_POST['zen_seo']);
+            $data['noindex'] = isset($_POST['zen_seo']['noindex']) ? 1 : 0;
             update_post_meta($post_id, '_zen_seo_data', $data);
         }
     }
 
     public function admin_notices() {
-        if (isset($_GET['settings-updated'])) echo '<div class="notice notice-success"><p>Configurações salvas com sucesso!</p></div>';
+        if (isset($_GET['settings-updated'])) echo '<div class="notice notice-success"><p>Configurações salvas!</p></div>';
     }
 
     // =========================================================================
-    // 3. API REST & SCHEMA
+    // 3. API REST & SCHEMA (GERAÇÃO AUTOMÁTICA DE SAMEAS)
     // =========================================================================
     public function register_api_fields() {
         register_rest_field(get_post_types(['public' => true]), 'head_tags', ['get_callback' => [$this, 'get_api_data']]);
@@ -143,20 +165,30 @@ class Zen_SEO_Lite {
         $desc = $meta['desc'] ?: wp_trim_words(get_post_field('post_content', $post_id), 20);
         $image = $meta['image'] ?: get_the_post_thumbnail_url($post_id, 'large') ?: $global['default_image'] ?: '';
         
-        $same_as = array_values(array_filter([
-            $global['wikidata'] ?? '', $global['musicbrainz'] ?? '', $global['spotify'] ?? '', $global['instagram'] ?? ''
-        ]));
+        // Gera lista completa de SameAs (exclui campos vazios e chaves de configuração como react_routes/default_image)
+        $same_as = [];
+        $ignored_keys = ['react_routes', 'default_image'];
+        foreach ($global as $key => $value) {
+            if (!empty($value) && !in_array($key, $ignored_keys) && filter_var($value, FILTER_VALIDATE_URL)) {
+                $same_as[] = $value;
+            }
+        }
 
         $schema = [
             '@context' => 'https://schema.org',
             '@graph' => [
                 [
-                    '@type' => 'Person',
+                    '@type' => 'Person', // Ou MusicGroup
                     '@id' => home_url('/#artist'),
                     'name' => 'DJ Zen Eyer',
                     'url' => home_url(),
+                    'jobTitle' => 'Brazilian Zouk DJ & Producer',
                     'sameAs' => $same_as,
-                    'image' => $global['default_image'] ?? ''
+                    'image' => $global['default_image'] ?? '',
+                    'memberOf' => [
+                        '@type' => 'Organization',
+                        'name' => 'Mensa International'
+                    ]
                 ],
                 [
                     '@type' => 'WebPage',
@@ -183,7 +215,7 @@ class Zen_SEO_Lite {
     }
 
     // =========================================================================
-    // 4. SITEMAP HÍBRIDO & ROBOTS
+    // 4. SITEMAP & ROBOTS
     // =========================================================================
     public function register_sitemap_rewrite() { add_rewrite_rule('sitemap\.xml$', 'index.php?zen_sitemap=1', 'top'); }
     public function register_query_vars($vars) { $vars[] = 'zen_sitemap'; return $vars; }
@@ -197,7 +229,7 @@ class Zen_SEO_Lite {
                 ob_start();
                 echo '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">';
                 
-                // 1. ROTAS REACT (Gerenciadas no Painel)
+                // 1. Rotas React
                 $global = get_option('zen_seo_global');
                 $raw_routes = $global['react_routes'] ?? "/\n/events\n/shop\n/music\n/zentribe\n/work-with-me\n/faq";
                 $routes = array_filter(array_map('trim', explode("\n", $raw_routes)));
@@ -205,18 +237,17 @@ class Zen_SEO_Lite {
                 $home = home_url();
                 foreach ($routes as $path) {
                     if (empty($path)) continue;
-                    $path = '/' . ltrim($path, '/'); // Garante barra inicial
+                    $path = '/' . ltrim($path, '/');
                     $loc = $home . $path;
                     $loc_pt = ($path === '/') ? $home . '/pt/' : str_replace($home, $home . '/pt', $loc);
                     
                     $prio = ($path === '/') ? '1.0' : '0.8';
-                    
                     echo '<url><loc>' . esc_url($loc) . '</loc><changefreq>weekly</changefreq><priority>' . $prio . '</priority>';
                     echo '<xhtml:link rel="alternate" hreflang="en" href="' . esc_url($loc) . '"/>';
                     echo '<xhtml:link rel="alternate" hreflang="pt-BR" href="' . esc_url($loc_pt) . '"/></url>';
                 }
 
-                // 2. POSTS WP
+                // 2. Posts WP
                 $types = ['post', 'page', 'product', 'remixes', 'flyers', 'events'];
                 foreach ($types as $pt) {
                     $posts = get_posts(['post_type' => $pt, 'posts_per_page' => -1, 'post_status' => 'publish']);
@@ -242,7 +273,7 @@ class Zen_SEO_Lite {
 
     public function custom_robots_txt($output, $public) {
         $sitemap = home_url('/sitemap.xml');
-        return "User-agent: *\nAllow: /\n\nDisallow: /wp-admin/\nDisallow: /wp-json/\n\nUser-agent: GPTBot\nAllow: /\n\nSitemap: $sitemap";
+        return "User-agent: *\nAllow: /\n\n# Bloqueios\nDisallow: /wp-admin/\nDisallow: /wp-json/\n\n# IAs\nUser-agent: GPTBot\nAllow: /\nUser-agent: Google-Extended\nAllow: /\n\nSitemap: $sitemap";
     }
 }
 
